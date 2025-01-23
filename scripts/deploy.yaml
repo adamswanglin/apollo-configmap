@@ -1,0 +1,562 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+    control-plane: controller-manager
+  name: apollo-configmap-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: apolloconfigs.apollo.adamswanglin.com
+spec:
+  group: apollo.adamswanglin.com
+  names:
+    kind: ApolloConfig
+    listKind: ApolloConfigList
+    plural: apolloconfigs
+    singular: apolloconfig
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ApolloConfig is the Schema for the apolloconfigs API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ApolloConfigSpec defines the desired state of ApolloConfig.
+            properties:
+              apollo:
+                description: Configs is the list of apollo configs
+                properties:
+                  accessKeySecret:
+                    description: AccessKeySecret is the secret key of the Apollo Config
+                      Server.
+                    type: string
+                  appId:
+                    description: AppId is apollo appId
+                    minLength: 1
+                    type: string
+                  clusterName:
+                    description: ClusterName is the name of cluster
+                    type: string
+                  namespaceName:
+                    description: NamespaceName is the name of namespace
+                    type: string
+                type: object
+              apolloConfigServer:
+                description: ConfigServer is the name of custom resource ApolloConfigServer
+                minLength: 1
+                type: string
+              configMap:
+                description: ConfigMap is the name of generated ConfigMap
+                minLength: 1
+                type: string
+              fileName:
+                description: FileName is the name of config file in ConfigMap. If
+                  not specified, apollo namespace name will be used
+                type: string
+            required:
+            - apollo
+            type: object
+          status:
+            description: ApolloConfigStatus defines the observed state of ApolloConfig.
+            properties:
+              lastSynced:
+                format: date-time
+                type: string
+              message:
+                type: string
+              notificationId:
+                type: integer
+              releaseKey:
+                type: string
+              syncStatus:
+                type: string
+              updateAt:
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: apolloconfigservers.apollo.adamswanglin.com
+spec:
+  group: apollo.adamswanglin.com
+  names:
+    kind: ApolloConfigServer
+    listKind: ApolloConfigServerList
+    plural: apolloconfigservers
+    singular: apolloconfigserver
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ApolloConfigServer is the Schema for the apolloconfigservers
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ApolloConfigServerSpec defines the desired state of ApolloConfigServer.
+            properties:
+              configServerURL:
+                description: ConfigServerURL is the URL of the Apollo Config Server.e.g.
+                  http://localhost:8080
+                pattern: ^https?://
+                type: string
+            required:
+            - configServerURL
+            type: object
+          status:
+            description: ApolloConfigServerStatus defines the observed state of ApolloConfigServer.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-controller-manager
+  namespace: apollo-configmap-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-leader-election-role
+  namespace: apollo-configmap-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-apolloconfig-admin-role
+rules:
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs
+  verbs:
+  - '*'
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-apolloconfig-editor-role
+rules:
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-apolloconfig-viewer-role
+rules:
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-apolloconfigserver-admin-role
+rules:
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigservers
+  verbs:
+  - '*'
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigservers/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-apolloconfigserver-editor-role
+rules:
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigservers/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-apolloconfigserver-viewer-role
+rules:
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigservers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigservers/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: apollo-configmap-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs
+  - apolloconfigservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs/finalizers
+  - apolloconfigservers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs/status
+  - apolloconfigservers/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: apollo-configmap-metrics-auth-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: apollo-configmap-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-leader-election-rolebinding
+  namespace: apollo-configmap-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: apollo-configmap-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: apollo-configmap-controller-manager
+  namespace: apollo-configmap-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+  name: apollo-configmap-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: apollo-configmap-manager-role
+subjects:
+- kind: ServiceAccount
+  name: apollo-configmap-controller-manager
+  namespace: apollo-configmap-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: apollo-configmap-metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: apollo-configmap-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: apollo-configmap-controller-manager
+  namespace: apollo-configmap-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+    control-plane: controller-manager
+  name: apollo-configmap-controller-manager-metrics-service
+  namespace: apollo-configmap-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app.kubernetes.io/name: apollo-configmap
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: apollo-configmap
+    control-plane: controller-manager
+  name: apollo-configmap-controller-manager
+  namespace: apollo-configmap-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: apollo-configmap
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: apollo-configmap
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --metrics-bind-address=:8443
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        command:
+        - /manager
+        image: registry.cn-hangzhou.aliyuncs.com/adamswanglin/apollo-configmap:1.0.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        ports: []
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts: []
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: apollo-configmap-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes: []

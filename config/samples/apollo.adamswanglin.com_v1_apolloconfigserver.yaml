@@ -1,0 +1,8 @@
+apiVersion: apollo.adamswanglin.com/v1
+kind: ApolloConfigServer
+metadata:
+  name: demo-server
+  labels:
+    app: apollo-config
+spec:
+  configServerURL: http://81.68.181.139:8080

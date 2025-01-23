@@ -1,0 +1,33 @@
+apiVersion: apollo.adamswanglin.com/v1
+kind: ApolloConfig
+metadata:
+  labels:
+    app: apollo-config
+  name: demo-config-1
+  namespace: default
+spec:
+  apollo:
+    accessKeySecret: 5e4f59f2035046c2a18e53e31b138f93
+    appId: "000111"
+    clusterName: default
+    namespaceName: application
+  apolloConfigServer: demo-server
+  configMap: apollo-config
+  fileName: application1.properties
+---
+apiVersion: apollo.adamswanglin.com/v1
+kind: ApolloConfig
+metadata:
+  labels:
+    app: apollo-config
+  name: demo-config-2
+  namespace: default
+spec:
+  apollo:
+    accessKeySecret: 10aa797ccd954aa287ce05bb7e4427fe
+    appId: "11111111"
+    clusterName: default
+    namespaceName: test.yaml
+  apolloConfigServer: demo-server
+  configMap: apollo-config-2
+  fileName: config.yaml

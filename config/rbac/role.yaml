@@ -1,0 +1,47 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs
+  - apolloconfigservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs/finalizers
+  - apolloconfigservers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apollo.adamswanglin.com
+  resources:
+  - apolloconfigs/status
+  - apolloconfigservers/status
+  verbs:
+  - get
+  - patch
+  - update

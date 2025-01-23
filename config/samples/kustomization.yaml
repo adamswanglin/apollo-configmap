@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- apollo.adamswanglin.com_v1_apolloconfigserver.yaml
+- apollo.adamswanglin.com_v1_apolloconfig.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
