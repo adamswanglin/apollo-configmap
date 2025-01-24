@@ -486,10 +486,10 @@ metadata:
   namespace: apollo-configmap-system
 spec:
   ports:
-  - name: https
-    port: 8443
+  - name: http
+    port: 8080
     protocol: TCP
-    targetPort: 8443
+    targetPort: 8080
   selector:
     app.kubernetes.io/name: apollo-configmap
     control-plane: controller-manager
@@ -519,7 +519,8 @@ spec:
     spec:
       containers:
       - args:
-        - --metrics-bind-address=:8443
+        - --metrics-secure=false
+        - --metrics-bind-address=:8080
         - --leader-elect
         - --health-probe-bind-address=:8081
         command:

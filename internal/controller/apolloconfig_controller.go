@@ -37,9 +37,6 @@ import (
 	apollov1 "adamswanglin.github.com/apollo-configmap/api/v1"
 )
 
-const SYNC_SYNCING = "Syncing"
-const SYNC_SUCCESS = "Success"
-
 // ApolloConfigReconciler reconciles a ApolloConfig object
 type ApolloConfigReconciler struct {
 	client.Client
@@ -78,6 +75,7 @@ func (r *ApolloConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("Reconciling ApolloConfig")
 	if err := r.Get(aCtx, req.NamespacedName, aCtx.apolloConfig); err != nil {
 		if apierrs.IsNotFound(err) {
+			r.ConfigStore.DeleteApolloConfig(req.NamespacedName.String())
 			log.Info("ApolloConfig not found. Ignoring since object must be deleted")
 			return internal.NoRequeue()
 		} else {
@@ -86,48 +84,58 @@ func (r *ApolloConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 	if internal.HasDeletionTimestamp(aCtx.apolloConfig.ObjectMeta) {
-		r.ConfigStore.DeleteApolloConfig(*aCtx.apolloConfig)
+		r.ConfigStore.DeleteApolloConfig(req.NamespacedName.String())
 		return internal.NoRequeue()
 	}
 
 	apolloConfigServer, err := internal.KeyToNamespacedName(aCtx.apolloConfig.Spec.ApolloConfigServer)
 	if err != nil {
+		r.ConfigStore.CreateOrUpdateApolloConfig(aCtx.apolloConfig, nil)
 		err = errors.New("Unable to parse ApolloConfigServer key " + aCtx.apolloConfig.Spec.ApolloConfigServer + "; key must bu full namespacedName eg. namespace/name")
-		_ = r.updateStatusAndReturnError(aCtx, SYNC_SYNCING, "", err)
+		_ = r.updateStatusAndReturnError(aCtx, internal.SYNC_STATUS_FAIL, "", err)
 		return internal.RequeueImmediately()
 	}
+
+	err = r.Get(aCtx, *apolloConfigServer, aCtx.apolloConfigServer)
+	r.ConfigStore.CreateOrUpdateApolloConfig(aCtx.apolloConfig, aCtx.apolloConfigServer)
+	if err != nil {
+		_ = r.updateStatusAndReturnError(aCtx, internal.SYNC_STATUS_FAIL, "", err)
+		return internal.RequeueImmediately()
+	}
+
 	//update label, used for filter
 	if aCtx.apolloConfig.Labels == nil {
 		aCtx.apolloConfig.Labels = map[string]string{
 			"apolloConfigServer": "",
 		}
 	}
+
 	if label, exist := aCtx.apolloConfig.Labels["apolloConfigServer"]; !exist || label != aCtx.apolloConfig.Spec.ApolloConfigServer {
 		aCtx.apolloConfig.Labels["apolloConfigServer"] = formatLabel(aCtx.apolloConfig.Spec.ApolloConfigServer)
 		//update label
 		if err := r.Update(aCtx, aCtx.apolloConfig); err != nil {
-			_ = r.updateStatusAndReturnError(aCtx, SYNC_SYNCING, "", err)
+			_ = r.updateStatusAndReturnError(aCtx, internal.SYNC_STATUS_FAIL, "", err)
 			return internal.RequeueImmediately()
 		}
 	}
 
-	if err := r.Get(aCtx, *apolloConfigServer, aCtx.apolloConfigServer); err != nil {
-		_ = r.updateStatusAndReturnError(aCtx, SYNC_SYNCING, "", err)
-		return internal.RequeueImmediately()
-	}
-	r.ConfigStore.CreateOrUpdateApolloConfig(*aCtx.apolloConfig, aCtx.apolloConfigServer)
-
-	if err := r.reconcileConfig(aCtx); err != nil {
+	if releaseKey, err := r.reconcileConfig(aCtx); err != nil {
 		log.Info("Got error while reconciling, will retry", "err", err.Error())
+		_ = r.updateStatusAndReturnError(aCtx, internal.SYNC_STATUS_SUCCESS, releaseKey, err)
 		return internal.RequeueImmediately()
+	} else {
+		err = r.updateStatusWithAdditional(aCtx, internal.SYNC_STATUS_SUCCESS, releaseKey, "")
+		if err != nil {
+			return internal.RequeueImmediately()
+		}
+		return internal.NoRequeue()
 	}
-	return internal.NoRequeue()
 
 }
 
-func (r *ApolloConfigReconciler) reconcileConfig(ctx apolloConfigContext) error {
-	if ctx.apolloConfig.Status.SyncStatus != SYNC_SYNCING {
-		return nil
+func (r *ApolloConfigReconciler) reconcileConfig(ctx apolloConfigContext) (string, error) {
+	if ctx.apolloConfig.Status.SyncStatus == internal.SYNC_STATUS_SUCCESS {
+		return "", nil
 	}
 	apolloConfig := ctx.apolloConfig
 
@@ -142,7 +150,7 @@ func (r *ApolloConfigReconciler) reconcileConfig(ctx apolloConfigContext) error 
 
 	releaseKey, content, err := r.ConfigStore.GetRemoteConfig(ctx.apolloConfig)
 	if err != nil {
-		return r.updateStatusAndReturnError(ctx, SYNC_SYNCING, releaseKey, errors.Wrap(err, "Unable to get config from apollo"))
+		return "", r.updateStatusAndReturnError(ctx, internal.SYNC_STATUS_FAIL, releaseKey, errors.Wrap(err, "Unable to get config from apollo"))
 	}
 	fileName := apolloConfig.Spec.FileName
 	if len(fileName) == 0 {
@@ -167,19 +175,17 @@ func (r *ApolloConfigReconciler) reconcileConfig(ctx apolloConfigContext) error 
 		if apierrs.IsNotFound(err) {
 			notFound = true
 		} else {
-			return nil
+			return releaseKey, nil
 		}
 	}
 
 	if notFound || !reflect.DeepEqual(configMap.Data, storedConfigMap.Data) {
 		// Create or Update the ConfigMap
 		if _, err = controllerutil.CreateOrUpdate(ctx, r.Client, configMap, mutateFn); err != nil {
-			return r.updateStatusAndReturnError(ctx, SYNC_SYNCING, releaseKey, errors.Wrap(err, "Unable to create or update ConfigMap"))
-		} else {
-			return r.updateStatusWithAdditional(ctx, SYNC_SUCCESS, releaseKey, "")
+			return releaseKey, errors.Wrap(err, "Unable to create or update ConfigMap")
 		}
 	}
-	return nil
+	return releaseKey, nil
 }
 
 // Helper method to update the status with the error message and status. If there was an error updating the status, return
@@ -202,15 +208,16 @@ func (r *ApolloConfigReconciler) updateStatusWithAdditional(ctx apolloConfigCont
 	if releaseKey != "" {
 		apolloConfigStatus.ReleaseKey = releaseKey
 	}
-	if status == SYNC_SYNCING {
-		apolloConfigStatus.UpdateAt = metav1.Now()
-		apolloConfigStatus.Message = additional
-	} else {
+	if status == internal.SYNC_STATUS_SUCCESS {
 		now := metav1.Now()
 		apolloConfigStatus.UpdateAt = now
 		apolloConfigStatus.LastSyncedSuccess = now
 		apolloConfigStatus.Message = additional
+	} else {
+		apolloConfigStatus.UpdateAt = metav1.Now()
+		apolloConfigStatus.Message = additional
 	}
+	r.ConfigStore.UpdateApolloClientSyncStatus(ctx.apolloConfig, status)
 
 	if err := r.Status().Update(ctx, ctx.apolloConfig); err != nil {
 		err = errors.Wrap(err, "Unable to update status")

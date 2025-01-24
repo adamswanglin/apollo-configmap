@@ -140,6 +140,33 @@ This example uses the demo environment from the [Apollo official documentation](
    kubectl delete apolloconfig demo-config-1 --cascade=orphan
    ```
 
+### Metrics & Monitoring
+
+The related Grafana dashboards can be found in the `grafana` folder.
+
+1. **Controller-runtime metrics provided by kubebuilder**  
+   See the [controller-runtime metrics reference](https://github.com/kubernetes-sigs/kubebuilder/blob/master/docs/book/src/reference/metrics-reference.md).
+
+2. **Custom Metrics**
+
+```metrics
+# Gauge type metric for the number of ApolloConfig resources
+# Labels: 
+# - resource_namespace: The namespace of the ApolloConfig resource in the Kubernetes cluster.
+# - sync_status: Synchronization status, including Success, Fail, or Syncing.
+apollo_config_count{resource_namespace="default", sync_status="Success"}
+
+# HTTP request metrics related to accessing Apollo Config Service (Counter and Bucket types)
+# Labels: 
+# - method: HTTP method.
+# - status: HTTP status.
+# - url: Request path (currently two types are monitored).
+http_requests_total{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+http_request_duration_seconds_count{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+http_request_duration_seconds_sum{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+http_request_duration_seconds_bucket{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+``` 
+
 ## Development and Deployment
 
 1. Use [kubebuilder markers](https://book.kubebuilder.io/reference/markers.html) to generate Kubernetes configurations:

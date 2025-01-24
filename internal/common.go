@@ -26,6 +26,10 @@ import (
 	"time"
 )
 
+const SYNC_STATUS_SYNCING = "Syncing"
+const SYNC_STATUS_FAIL = "Fail"
+const SYNC_STATUS_SUCCESS = "Success"
+
 // RequeueIfError requeues if an error is found.
 func RequeueIfError(err error) (ctrl.Result, error) {
 	return ctrl.Result{}, err

@@ -153,6 +153,25 @@ kubectl delete apolloconfigs  demo-config-1
 # 仅删除ApolloConfig
 kubectl delete apolloconfigs  demo-config-1 --cascade=orphan
 ```
+## 指标监控
+
+相关grafana dashboard 见 grafana 文件夹
+
+1. kubebuilder自带的 [controller-runtime指标](https://github.com/kubernetes-sigs/kubebuilder/blob/master/docs/book/src/reference/metrics-reference.md)
+
+2. 自定义指标
+```metrics
+# ApolloConfig 数量 Gauge类型
+# label: resource_namespace ApolloConfig 所在K8S集群namespace, sync_status 同步状态 包括 Success/Fail/Syncing
+apollo_config_count{resource_namespace="default", sync_status="Success"}
+
+# 访问Apollo Config Service的http请求相关Counter和Bucket类型
+# label: method HTTP Method, status HTTP Status， url 请求路径(目前有两种）
+http_requests_total{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+http_request_duration_seconds_count{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+http_request_duration_seconds_sum{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+http_request_duration_seconds_bucket{method="GET", status="OK", url="configs/{appId}/{clusterName}/{namespaceName}"}
+```
 
 ## 开发部署
 1. 本包使用 [kubebuilder markers](https://book.kubebuilder.io/reference/markers.html) 生成 Kubernetes 配置。运行 `make manifests` 以在 `config/crd` 和 `config/rbac` 中创建 CRD 和角色。

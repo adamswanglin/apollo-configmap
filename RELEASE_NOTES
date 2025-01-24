@@ -1,0 +1,8 @@
+========================================================================
+Apollo ConfigMap v1.1.0 (2025-01-24)
+========================================================================
+BugFixes:
+* [Core] Delete ApolloConfig apolloClient exists
+
+Enhancements:
+* [Metrics] Add http client and sync count metrics

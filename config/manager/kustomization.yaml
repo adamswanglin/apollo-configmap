@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: registry.cn-hangzhou.aliyuncs.com/adamswanglin/apollo-configmap
-  newTag: 1.0.0
+  newTag: 1.1.0

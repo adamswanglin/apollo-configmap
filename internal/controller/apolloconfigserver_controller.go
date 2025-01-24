@@ -79,7 +79,7 @@ func (r *ApolloConfigServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	for _, apolloConfig := range apolloConfigList.Items {
 		<-ticker.C
 		//update status
-		r.ConfigStore.CreateOrUpdateApolloConfig(apolloConfig, apolloConfigServer)
+		r.ConfigStore.CreateOrUpdateApolloConfig(&apolloConfig, apolloConfigServer)
 
 	}
 
