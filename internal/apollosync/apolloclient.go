@@ -112,6 +112,9 @@ type RemoteConfig struct {
 }
 
 type ApolloClient struct {
+	configStore   *ConfigStore
+	RemoteResult  *RemoteConfig
+	log           logr.Logger
 	serverAddress string
 	accessKey     string
 	appId         string
@@ -119,10 +122,7 @@ type ApolloClient struct {
 	namespaceName string
 	key           string
 	retryInterval time.Duration
-	RemoteResult  *RemoteConfig
-	log           logr.Logger
-	configStore   *ConfigStore
-	rwMutex       sync.RWMutex
+	rwMutex       *sync.RWMutex
 	cancelFunc    context.CancelFunc
 }
 
@@ -132,8 +132,12 @@ func NewApolloClient(apolloConfig *v1.ApolloConfig, apolloConfigServer *v1.Apoll
 	if apolloConfig.Status.NotificationId > 0 {
 		notificationId = apolloConfig.Status.NotificationId
 	}
+	serverAddress := ""
+	if apolloConfigServer != nil {
+		serverAddress = apolloConfigServer.Spec.ConfigServerURL
+	}
 	apolloClient := ApolloClient{
-		serverAddress: apolloConfigServer.Spec.ConfigServerURL,
+		serverAddress: serverAddress,
 		accessKey:     apolloConfig.Spec.Apollo.AccessKeySecret,
 		appId:         apolloConfig.Spec.Apollo.AppId,
 		clusterName:   apolloConfig.Spec.Apollo.ClusterName,
@@ -141,11 +145,11 @@ func NewApolloClient(apolloConfig *v1.ApolloConfig, apolloConfigServer *v1.Apoll
 		configStore:   configStore,
 		key:           convertToKey(apolloConfig),
 		retryInterval: initialRetryInterval,
-		log:           log.FromContext(context.Background()).WithValues("appId", apolloConfig.Spec.Apollo.AppId, "clusterName", apolloConfig.Spec.Apollo.ClusterName, "namespaceName", apolloConfig.Spec.Apollo.NamespaceName, "serverAddress", apolloConfigServer.Spec.ConfigServerURL),
+		log:           log.FromContext(context.Background()).WithValues("appId", apolloConfig.Spec.Apollo.AppId, "clusterName", apolloConfig.Spec.Apollo.ClusterName, "namespaceName", apolloConfig.Spec.Apollo.NamespaceName, "serverAddress", serverAddress),
 		RemoteResult: &RemoteConfig{
 			NotificationId: notificationId,
 		},
-		rwMutex: sync.RWMutex{},
+		rwMutex: &sync.RWMutex{},
 	}
 	return &apolloClient
 }
@@ -272,6 +276,9 @@ type Notification struct {
 
 // doRequestForNotification do request for config change notification
 func (client *ApolloClient) doRequestForNotification(ctx context.Context) error {
+	if len(client.serverAddress) == 0 {
+		return errors.New("serverAddress is empty")
+	}
 
 	// Create the HTTP request
 	req, err := client.notifyRequest(ctx)

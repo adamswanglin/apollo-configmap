@@ -38,7 +38,7 @@ var (
 			Name: "apollo_config_count",
 			Help: "Total number of ApolloConfig",
 		},
-		[]string{"namespace", "status"},
+		[]string{"resource_namespace", "sync_status"},
 	)
 )
 
@@ -46,24 +46,18 @@ func init() {
 	metrics.Registry.MustRegister(syncMetrics)
 }
 
-type SyncStatusCount struct {
-	Success int
-	Syncing int
-	Fail    int
-}
-
 // ConfigStore a bridge between remote config and k8s ApolloConfig CR
 type ConfigStore struct {
 	// key is apollo, value is remote config release key
 	remoteConfigReleaseMap map[string]*ApolloClient
-	rwMutex                sync.RWMutex
+	rwMutex                *sync.RWMutex
 	k8sClient              client.Client
 }
 
 func NewConfigStore(k8sClient client.Client) *ConfigStore {
 	configStore := &ConfigStore{
 		remoteConfigReleaseMap: make(map[string]*ApolloClient),
-		rwMutex:                sync.RWMutex{},
+		rwMutex:                &sync.RWMutex{},
 		k8sClient:              k8sClient,
 	}
 	//定期更新statusCount
@@ -71,32 +65,30 @@ func NewConfigStore(k8sClient client.Client) *ConfigStore {
 		for {
 			time.Sleep(time.Second * 20)
 			configStore.rwMutex.RLock()
-			namespacedCount := make(map[string]*SyncStatusCount)
+			namespacedCount := make(map[string]map[string]int)
 			for key, apolloClient := range configStore.remoteConfigReleaseMap {
+				status := apolloClient.RemoteResult.SyncStatus
 				namespaceName, err := internal.KeyToNamespacedName(key)
 				if err != nil {
 					continue
 				}
 				statusCount, ok := namespacedCount[namespaceName.Namespace]
 				if !ok {
-					statusCount = &SyncStatusCount{}
+					statusCount = make(map[string]int)
 					namespacedCount[namespaceName.Namespace] = statusCount
 				}
-				switch apolloClient.RemoteResult.SyncStatus {
-				case internal.SYNC_STATUS_SUCCESS:
-					statusCount.Success++
-				case internal.SYNC_STATUS_SYNCING:
-					statusCount.Syncing++
-				case internal.SYNC_STATUS_FAIL:
-					statusCount.Fail++
+				if ct, ok := statusCount[status]; ok {
+					statusCount[status] = ct + 1
+				} else {
+					statusCount[status] = 1
 				}
 			}
 			configStore.rwMutex.RUnlock()
+			syncMetrics.Reset()
 			for ns, count := range namespacedCount {
-				syncMetrics.WithLabelValues(ns, SYNC_ALL).Set(float64(count.Success + count.Syncing + count.Fail))
-				syncMetrics.WithLabelValues(ns, internal.SYNC_STATUS_SUCCESS).Set(float64(count.Success))
-				syncMetrics.WithLabelValues(ns, internal.SYNC_STATUS_SYNCING).Set(float64(count.Syncing))
-				syncMetrics.WithLabelValues(ns, internal.SYNC_STATUS_FAIL).Set(float64(count.Fail))
+				for status, i := range count {
+					syncMetrics.WithLabelValues(ns, status).Set(float64(i))
+				}
 			}
 		}
 	}()
@@ -105,13 +97,12 @@ func NewConfigStore(k8sClient client.Client) *ConfigStore {
 }
 
 // DeleteApolloConfig delete apollo config
-func (configStore *ConfigStore) DeleteApolloConfig(apolloConfig v1.ApolloConfig) {
+func (configStore *ConfigStore) DeleteApolloConfig(namespacedName string) {
 	configStore.rwMutex.Lock()
 	defer configStore.rwMutex.Unlock()
-	key := convertToKey(&apolloConfig)
-	if apolloClient, ok := configStore.remoteConfigReleaseMap[key]; ok {
+	if apolloClient, ok := configStore.remoteConfigReleaseMap[namespacedName]; ok {
 		apolloClient.stopPolling()
-		delete(configStore.remoteConfigReleaseMap, key)
+		delete(configStore.remoteConfigReleaseMap, namespacedName)
 	}
 }
 
