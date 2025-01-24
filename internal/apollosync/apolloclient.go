@@ -22,12 +22,14 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/iancoleman/orderedmap"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"io"
 	"k8s.io/apimachinery/pkg/util/json"
 	"math"
 	"net/http"
 	"net/url"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,17 +43,72 @@ const (
 )
 
 var (
-	running      = make(map[string]context.CancelFunc)
-	runningMutex sync.Mutex
-	httpClient   = &http.Client{
+	//cancelFuncs = make(map[string]context.CancelFunc)
+	//cancelMutex sync.Mutex
+
+	httpClient = &http.Client{
 		Timeout: 70 * time.Second, // Set timeout for the request
+		Transport: &MetricsRoundTripper{
+			transport: http.DefaultTransport,
+		},
 	}
+	httpRequestDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_duration_seconds",
+			Help:    "Duration of HTTP requests in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method", "url", "status"},
+	)
+	httpRequestCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"method", "url", "status"},
+	)
 )
+
+func init() {
+	metrics.Registry.MustRegister(httpRequestDuration, httpRequestCount)
+}
+
+// MetricsRoundTripper is a custom RoundTripper that captures HTTP metrics.
+type MetricsRoundTripper struct {
+	transport http.RoundTripper
+}
+
+// RoundTrip captures metrics for each HTTP request.
+func (m *MetricsRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	start := time.Now()
+	resp, err := m.transport.RoundTrip(req)
+	duration := time.Since(start).Seconds()
+
+	status := "error"
+	if resp != nil {
+		status = http.StatusText(resp.StatusCode)
+	}
+
+	// replace path configs/{appId}/{clusterName}/{namespaceName} notifications/v2
+	path := req.URL.Path
+	if strings.Contains(path, "notifications/v2") {
+		path = "notifications/v2"
+	} else {
+		path = "configs/{appId}/{clusterName}/{namespaceName}"
+	}
+
+	// Update metrics
+	httpRequestDuration.WithLabelValues(req.Method, path, status).Observe(duration)
+	httpRequestCount.WithLabelValues(req.Method, path, status).Inc()
+
+	return resp, err
+}
 
 type RemoteConfig struct {
 	ReleaseKey     string
 	NotificationId int
 	Config         string
+	SyncStatus     string
 }
 
 type ApolloClient struct {
@@ -66,13 +123,14 @@ type ApolloClient struct {
 	log           logr.Logger
 	configStore   *ConfigStore
 	rwMutex       sync.RWMutex
+	cancelFunc    context.CancelFunc
 }
 
 func NewApolloClient(apolloConfig *v1.ApolloConfig, apolloConfigServer *v1.ApolloConfigServer, configStore *ConfigStore) *ApolloClient {
 
-	notifcationId := initialNotificationId
-	if apolloConfig.Status.NotificationId > 0 && apolloConfig.Status.SyncStatus != SYNC_SYNCING {
-		notifcationId = apolloConfig.Status.NotificationId
+	notificationId := initialNotificationId
+	if apolloConfig.Status.NotificationId > 0 {
+		notificationId = apolloConfig.Status.NotificationId
 	}
 	apolloClient := ApolloClient{
 		serverAddress: apolloConfigServer.Spec.ConfigServerURL,
@@ -85,7 +143,7 @@ func NewApolloClient(apolloConfig *v1.ApolloConfig, apolloConfigServer *v1.Apoll
 		retryInterval: initialRetryInterval,
 		log:           log.FromContext(context.Background()).WithValues("appId", apolloConfig.Spec.Apollo.AppId, "clusterName", apolloConfig.Spec.Apollo.ClusterName, "namespaceName", apolloConfig.Spec.Apollo.NamespaceName, "serverAddress", apolloConfigServer.Spec.ConfigServerURL),
 		RemoteResult: &RemoteConfig{
-			NotificationId: notifcationId,
+			NotificationId: notificationId,
 		},
 		rwMutex: sync.RWMutex{},
 	}
@@ -187,15 +245,8 @@ func (client *ApolloClient) resetRetryInterval() {
 // startPolling start polling
 func (client *ApolloClient) startPolling() {
 	ctx, cancel := context.WithCancel(context.Background())
-	runningMutex.Lock()
-	running[client.key] = cancel
-	runningMutex.Unlock()
+	client.cancelFunc = cancel
 	go func() {
-		defer func() {
-			runningMutex.Lock()
-			delete(running, client.key)
-			runningMutex.Unlock()
-		}()
 		for {
 			select {
 			case <-ctx.Done():
@@ -352,10 +403,5 @@ func (client *ApolloClient) getRemoteConfig(ctx context.Context) (releaseKey str
 }
 
 func (client *ApolloClient) stopPolling() {
-	runningMutex.Lock()
-	if cancel, ok := running[client.key]; ok {
-		cancel()
-		delete(running, client.key)
-	}
-	runningMutex.Unlock()
+	client.cancelFunc()
 }

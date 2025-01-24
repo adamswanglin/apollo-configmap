@@ -21,18 +21,39 @@ import (
 	"adamswanglin.github.com/apollo-configmap/internal"
 	"context"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sync"
+	"time"
 )
 
-const SYNC_SYNCING = "Syncing"
+const SYNC_ALL = "all"
+
+var (
+	syncMetrics = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apollo_config_count",
+			Help: "Total number of ApolloConfig",
+		},
+		[]string{"namespace", "status"},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(syncMetrics)
+}
+
+type SyncStatusCount struct {
+	Success int
+	Syncing int
+	Fail    int
+}
 
 // ConfigStore a bridge between remote config and k8s ApolloConfig CR
 type ConfigStore struct {
-	// key is apollo, value is local config release key
-	localConfigReleaseMap map[string]string
 	// key is apollo, value is remote config release key
 	remoteConfigReleaseMap map[string]*ApolloClient
 	rwMutex                sync.RWMutex
@@ -40,12 +61,47 @@ type ConfigStore struct {
 }
 
 func NewConfigStore(k8sClient client.Client) *ConfigStore {
-	return &ConfigStore{
-		localConfigReleaseMap:  make(map[string]string),
+	configStore := &ConfigStore{
 		remoteConfigReleaseMap: make(map[string]*ApolloClient),
 		rwMutex:                sync.RWMutex{},
 		k8sClient:              k8sClient,
 	}
+	//定期更新statusCount
+	go func() {
+		for {
+			time.Sleep(time.Second * 20)
+			configStore.rwMutex.RLock()
+			namespacedCount := make(map[string]*SyncStatusCount)
+			for key, apolloClient := range configStore.remoteConfigReleaseMap {
+				namespaceName, err := internal.KeyToNamespacedName(key)
+				if err != nil {
+					continue
+				}
+				statusCount, ok := namespacedCount[namespaceName.Namespace]
+				if !ok {
+					statusCount = &SyncStatusCount{}
+					namespacedCount[namespaceName.Namespace] = statusCount
+				}
+				switch apolloClient.RemoteResult.SyncStatus {
+				case internal.SYNC_STATUS_SUCCESS:
+					statusCount.Success++
+				case internal.SYNC_STATUS_SYNCING:
+					statusCount.Syncing++
+				case internal.SYNC_STATUS_FAIL:
+					statusCount.Fail++
+				}
+			}
+			configStore.rwMutex.RUnlock()
+			for ns, count := range namespacedCount {
+				syncMetrics.WithLabelValues(ns, SYNC_ALL).Set(float64(count.Success + count.Syncing + count.Fail))
+				syncMetrics.WithLabelValues(ns, internal.SYNC_STATUS_SUCCESS).Set(float64(count.Success))
+				syncMetrics.WithLabelValues(ns, internal.SYNC_STATUS_SYNCING).Set(float64(count.Syncing))
+				syncMetrics.WithLabelValues(ns, internal.SYNC_STATUS_FAIL).Set(float64(count.Fail))
+			}
+		}
+	}()
+
+	return configStore
 }
 
 // DeleteApolloConfig delete apollo config
@@ -57,24 +113,21 @@ func (configStore *ConfigStore) DeleteApolloConfig(apolloConfig v1.ApolloConfig)
 		apolloClient.stopPolling()
 		delete(configStore.remoteConfigReleaseMap, key)
 	}
-	if _, ok := configStore.localConfigReleaseMap[key]; ok {
-		delete(configStore.localConfigReleaseMap, key)
-	}
 }
 
 // CreateOrUpdateApolloConfig create or update apollo config
-func (configStore *ConfigStore) CreateOrUpdateApolloConfig(apolloConfig v1.ApolloConfig, apolloConfigServer *v1.ApolloConfigServer) {
+func (configStore *ConfigStore) CreateOrUpdateApolloConfig(apolloConfig *v1.ApolloConfig, apolloConfigServer *v1.ApolloConfigServer) {
 	configStore.rwMutex.Lock()
 	defer configStore.rwMutex.Unlock()
-	key := convertToKey(&apolloConfig)
-	newApolloConfig := NewApolloClient(&apolloConfig, apolloConfigServer, configStore)
+	key := convertToKey(apolloConfig)
+	newApolloConfig := NewApolloClient(apolloConfig, apolloConfigServer, configStore)
 	if apolloClient, ok := configStore.remoteConfigReleaseMap[key]; ok {
 		if apolloClient.serverAddress != newApolloConfig.serverAddress ||
 			apolloClient.appId != newApolloConfig.appId ||
 			apolloClient.clusterName != newApolloConfig.clusterName ||
 			apolloClient.namespaceName != newApolloConfig.namespaceName ||
 			apolloClient.accessKey != newApolloConfig.accessKey {
-			//changed
+			//avoid partial update
 			apolloClient.rwMutex.Lock()
 			defer apolloClient.rwMutex.Unlock()
 
@@ -89,6 +142,15 @@ func (configStore *ConfigStore) CreateOrUpdateApolloConfig(apolloConfig v1.Apoll
 	} else {
 		configStore.remoteConfigReleaseMap[key] = newApolloConfig
 		newApolloConfig.startPolling()
+	}
+}
+
+func (configStore *ConfigStore) UpdateApolloClientSyncStatus(apolloConfig *v1.ApolloConfig, syncStatus string) {
+	configStore.rwMutex.RLock()
+	defer configStore.rwMutex.RUnlock()
+	key := convertToKey(apolloConfig)
+	if apolloClient, ok := configStore.remoteConfigReleaseMap[key]; ok {
+		apolloClient.RemoteResult.SyncStatus = syncStatus
 	}
 }
 
@@ -109,7 +171,7 @@ func (configStore *ConfigStore) NotifyApolloConfigChange(namespacedName string, 
 		} else {
 			apolloConfig.Status.NotificationId = notificationId
 			apolloConfig.Status.UpdateAt = metav1.Now()
-			apolloConfig.Status.SyncStatus = SYNC_SYNCING
+			apolloConfig.Status.SyncStatus = internal.SYNC_STATUS_SYNCING
 			err := configStore.k8sClient.Status().Update(context.Background(), apolloConfig)
 			if err != nil {
 				return err

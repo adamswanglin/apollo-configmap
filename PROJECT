@@ -5,6 +5,8 @@
 domain: adamswanglin.com
 layout:
 - go.kubebuilder.io/v4
+plugins:
+  grafana.kubebuilder.io/v1-alpha: {}
 projectName: apollo-configmap
 repo: adamswanglin.github.com/apollo-configmap
 resources:
