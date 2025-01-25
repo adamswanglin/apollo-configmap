@@ -525,8 +525,8 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: registry.cn-hangzhou.aliyuncs.com/adamswanglin/apollo-configmap:1.0.0
-        imagePullPolicy: IfNotPresent
+        image: registry.cn-hangzhou.aliyuncs.com/adamswanglin/apollo-configmap:1.1.0
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
