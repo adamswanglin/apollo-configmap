@@ -17,12 +17,13 @@
 package main
 
 import (
-	"adamswanglin.github.com/apollo-configmap/internal/apollosync"
-	"adamswanglin.github.com/apollo-configmap/internal/controller"
 	"crypto/tls"
 	"flag"
 	"os"
 	"path/filepath"
+
+	"adamswanglin.github.com/apollo-configmap/internal/apollosync"
+	"adamswanglin.github.com/apollo-configmap/internal/controller"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.

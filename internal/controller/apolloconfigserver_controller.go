@@ -17,12 +17,13 @@
 package controller
 
 import (
-	"adamswanglin.github.com/apollo-configmap/internal"
-	"adamswanglin.github.com/apollo-configmap/internal/apollosync"
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"strings"
 	"time"
+
+	"adamswanglin.github.com/apollo-configmap/internal"
+	"adamswanglin.github.com/apollo-configmap/internal/apollosync"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -61,10 +62,10 @@ func (r *ApolloConfigServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		logger.Error(err, "Failed to get ApolloConfigServer")
 		return internal.RequeueImmediately()
 	}
-	//list all related ApolloConfig
+	// list all related ApolloConfig
 	apolloConfigList := apolloadamswanglincomv1.ApolloConfigList{}
-	//filter spec.apolloConfigServer
-	//page list, but not all
+	// filter spec.apolloConfigServer
+	// page list, but not all
 	if err := r.List(ctx, &apolloConfigList, client.MatchingLabels{
 		"apolloConfigServer": formatLabel(req.NamespacedName.String()),
 	}); err != nil {
@@ -78,7 +79,7 @@ func (r *ApolloConfigServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	for _, apolloConfig := range apolloConfigList.Items {
 		<-ticker.C
-		//update status
+		// update status
 		r.ConfigStore.CreateOrUpdateApolloConfig(&apolloConfig, apolloConfigServer)
 
 	}
