@@ -17,23 +17,24 @@
 package apollosync
 
 import (
-	v1 "adamswanglin.github.com/apollo-configmap/api/v1"
 	"context"
-	"github.com/go-logr/logr"
-	"github.com/iancoleman/orderedmap"
-	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"io"
-	"k8s.io/apimachinery/pkg/util/json"
 	"math"
 	"net/http"
 	"net/url"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	v1 "adamswanglin.github.com/apollo-configmap/api/v1"
+	"github.com/go-logr/logr"
+	"github.com/iancoleman/orderedmap"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/util/json"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
@@ -43,9 +44,6 @@ const (
 )
 
 var (
-	//cancelFuncs = make(map[string]context.CancelFunc)
-	//cancelMutex sync.Mutex
-
 	httpClient = &http.Client{
 		Timeout: 70 * time.Second, // Set timeout for the request
 		Transport: &MetricsRoundTripper{
@@ -156,7 +154,7 @@ func NewApolloClient(apolloConfig *v1.ApolloConfig, apolloConfigServer *v1.Apoll
 
 // notifyRequest see: https://www.apolloconfig.com/#/zh/client/other-language-client-user-guide?id=_142-http%e6%8e%a5%e5%8f%a3%e8%af%b4%e6%98%8e
 func (client *ApolloClient) notifyRequest(ctx context.Context) (*http.Request, error) {
-	//avoid partial param change
+	// avoid partial param change
 	client.rwMutex.RLock()
 	defer client.rwMutex.RUnlock()
 
@@ -207,7 +205,7 @@ func (client *ApolloClient) notifyRequest(ctx context.Context) (*http.Request, e
 
 // getConfigRequest see: https://www.apolloconfig.com/#/zh/client/other-language-client-user-guide?id=_13-%e9%80%9a%e8%bf%87%e4%b8%8d%e5%b8%a6%e7%bc%93%e5%ad%98%e7%9a%84http%e6%8e%a5%e5%8f%a3%e4%bb%8eapollo%e8%af%bb%e5%8f%96%e9%85%8d%e7%bd%ae
 func (client *ApolloClient) getConfigRequest(ctx context.Context) (*http.Request, error) {
-	//avoid partial param change
+	// avoid partial param change
 	client.rwMutex.RLock()
 	defer client.rwMutex.RUnlock()
 
@@ -292,7 +290,10 @@ func (client *ApolloClient) doRequestForNotification(ctx context.Context) error 
 	resp, err = httpClient.Do(req)
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			err := resp.Body.Close()
+			if err != nil {
+				return
+			}
 		}
 	}()
 
@@ -312,18 +313,18 @@ func (client *ApolloClient) doRequestForNotification(ctx context.Context) error 
 		if len(*notifications) == 0 {
 			return errors.New("Error notification response body, " + ", body :" + string(body))
 		}
-		//Update ApolloConfig Status
+		// Update ApolloConfig Status
 		notificationId := (*notifications)[0].NotificationID
 		if err := client.configStore.NotifyApolloConfigChange(client.key, notificationId); err == nil {
 			client.RemoteResult.NotificationId = notificationId
 		} else {
-			//update status error, will auto retry apollo notify request
+			// update status error, will auto retry apollo notify request
 			return err
 		}
 
 		return nil
 	} else if resp != nil && resp.StatusCode == http.StatusNotModified {
-		//unchanged
+		// unchanged
 		return nil
 	} else {
 		if err == nil {
@@ -343,69 +344,72 @@ type configRetriveResponse struct {
 }
 
 // getRemoteConfig update remote config from apollo
-func (client *ApolloClient) getRemoteConfig(ctx context.Context) (releaseKey string, fileContent string, err error) {
+func (client *ApolloClient) getRemoteConfig() (releaseKey string, fileContent string, err error) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 	req, err := client.getConfigRequest(ctx1)
 	if err != nil {
-		return
+		return releaseKey, fileContent, err
 	}
 	resp, err := httpClient.Do(req)
 	defer func() {
 		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
+			err := resp.Body.Close()
+			if err != nil {
+				return
+			}
 		}
 	}()
 	if err != nil {
 		err = errors.Wrap(err, "failed to execute HTTP request")
-		return
+		return releaseKey, fileContent, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, err2 := io.ReadAll(resp.Body)
 		if err2 != nil {
 			err = errors.Wrap(err2, "error reading config response body")
-			return
+			return releaseKey, fileContent, err
 		}
 		err = errors.New("error getting config from apollo response: " + string(body))
-		return
+		return releaseKey, fileContent, err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		err = errors.Wrap(err, "error reading config response body")
-		return
+		return releaseKey, fileContent, err
 	}
 
 	configResponse := new(configRetriveResponse)
 	if err = json.Unmarshal(body, &configResponse); err != nil {
 		err = errors.Wrap(err, "error unmarshaling config response: "+string(body))
-		return
+		return releaseKey, fileContent, err
 	}
 
-	//properties file content is key value paris in Configurations
-	//for xml、json、yml、yaml、txt file content in key content
+	// properties file content is key value paris in Configurations
+	// for xml、json、yml、yaml、txt file content in key content
 	releaseKey = configResponse.ReleaseKey
 	if len(configResponse.Configurations.Keys()) == 0 {
 		err = errors.New("empty config from apollo: " + string(body))
-		return
+		return releaseKey, fileContent, err
 	} else if content, exist := configResponse.Configurations.Get("content"); len(configResponse.Configurations.Keys()) == 1 && exist {
 		fileContent = content.(string)
-		return
+		return releaseKey, fileContent, err
 	} else {
 		sb := strings.Builder{}
 		for _, key := range configResponse.Configurations.Keys() {
 			value, _ := configResponse.Configurations.Get(key)
 			sb.WriteString(key)
 			sb.WriteString(" = ")
-			//value中的特殊符号需要转义
+			// value中的特殊符号需要转义
 			sb.WriteString(strings.ReplaceAll(value.(string), "\n", "\\n"))
 			sb.WriteString("\n")
 
 		}
 		fileContent = sb.String()
-		return
+		return releaseKey, fileContent, err
 	}
 }
 

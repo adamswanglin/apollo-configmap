@@ -17,17 +17,18 @@
 package apollosync
 
 import (
+	"context"
+	"sync"
+	"time"
+
 	v1 "adamswanglin.github.com/apollo-configmap/api/v1"
 	"adamswanglin.github.com/apollo-configmap/internal"
-	"context"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
-	"sync"
-	"time"
 )
 
 const SYNC_ALL = "all"
@@ -60,7 +61,7 @@ func NewConfigStore(k8sClient client.Client) *ConfigStore {
 		rwMutex:                &sync.RWMutex{},
 		k8sClient:              k8sClient,
 	}
-	//定期更新statusCount
+	// 定期更新statusCount
 	go func() {
 		for {
 			time.Sleep(time.Second * 20)
@@ -118,7 +119,7 @@ func (configStore *ConfigStore) CreateOrUpdateApolloConfig(apolloConfig *v1.Apol
 			apolloClient.clusterName != newApolloConfig.clusterName ||
 			apolloClient.namespaceName != newApolloConfig.namespaceName ||
 			apolloClient.accessKey != newApolloConfig.accessKey {
-			//avoid partial update
+			// avoid partial update
 			apolloClient.rwMutex.Lock()
 			defer apolloClient.rwMutex.Unlock()
 
@@ -180,7 +181,7 @@ func (configStore *ConfigStore) GetRemoteConfig(apolloConfig *v1.ApolloConfig) (
 	defer configStore.rwMutex.RUnlock()
 	key := convertToKey(apolloConfig)
 	if apolloClient, ok := configStore.remoteConfigReleaseMap[key]; ok {
-		return apolloClient.getRemoteConfig(context.Background())
+		return apolloClient.getRemoteConfig()
 	} else {
 		return "", "", errors.New("Apollo client not initialized: " + key)
 	}

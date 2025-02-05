@@ -17,13 +17,14 @@
 package internal
 
 import (
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"strings"
-	"time"
 )
 
 const SYNC_STATUS_SYNCING = "Syncing"
@@ -81,7 +82,7 @@ func HasDeletionTimestamp(obj metav1.ObjectMeta) bool {
 
 // KeyToNamespacedName convert key to namespacedName
 func KeyToNamespacedName(namespacedName string) (*types.NamespacedName, error) {
-	//unmarshal
+	// unmarshal
 	nameAndSpace := strings.Split(namespacedName, string(types.Separator))
 	if len(nameAndSpace) != 2 {
 		return nil, errors.New("Invalid namespacedName :" + namespacedName)

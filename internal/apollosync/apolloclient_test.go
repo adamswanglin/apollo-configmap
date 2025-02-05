@@ -19,8 +19,9 @@ package apollosync
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/iancoleman/orderedmap"
 	"testing"
+
+	"github.com/iancoleman/orderedmap"
 )
 
 // KeyValue 用于保存键值对
@@ -43,7 +44,7 @@ func TestKVJson(t *testing.T) {
 	// 按插入顺序遍历
 	for _, key := range omap.Keys() {
 		value, _ := omap.Get(key)
-		//convert to string
+		// convert to string
 
 		fmt.Printf("%s: %v\n", key, value)
 	}
