@@ -19,6 +19,7 @@ package apollosync
 import (
 	"log"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/go-logr/stdr"
@@ -42,7 +43,8 @@ func TestUpdateRemoteConfig(t *testing.T) {
 			Config:         "",
 		},
 		// set log to fmt
-		log: logger,
+		log:     logger,
+		rwMutex: &sync.RWMutex{},
 	}
 	_, str, err := apolloClient.getRemoteConfig()
 	if err == nil {
