@@ -17,13 +17,14 @@
 package internal
 
 import (
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"strings"
-	"time"
 )
 
 const SYNC_STATUS_SYNCING = "Syncing"
@@ -46,7 +47,7 @@ func RequeueImmediatelyUnlessGenerationChanged(prevGeneration, curGeneration int
 	return NoRequeue()
 }
 
-// Note: In unit test we use Result from apollosync-runtime package from https://github.com/kubernetes-sigs/controller-runtime/blob/2027a413747f2a8cada813dd98b3b1473c253913/pkg/reconcile/reconcile.go#L26
+// Note: In unit test we use Result from apollo-configmap-runtime package from https://github.com/kubernetes-sigs/controller-runtime/blob/2027a413747f2a8cada813dd98b3b1473c253913/pkg/reconcile/reconcile.go#L26
 //       The semantic is as follows (result.Requeue)
 //       if Requeue is True then always requeue duration can be optional.
 //       if Requeue is False and if duration is 0 then NO requeue, but if duration is > 0 then requeue after duration. Its a bit  confusing hence this note.
@@ -81,7 +82,7 @@ func HasDeletionTimestamp(obj metav1.ObjectMeta) bool {
 
 // KeyToNamespacedName convert key to namespacedName
 func KeyToNamespacedName(namespacedName string) (*types.NamespacedName, error) {
-	//unmarshal
+	// unmarshal
 	nameAndSpace := strings.Split(namespacedName, string(types.Separator))
 	if len(nameAndSpace) != 2 {
 		return nil, errors.New("Invalid namespacedName :" + namespacedName)

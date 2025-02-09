@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 
+	"adamswanglin.github.com/apollo-configmap/internal/apollosync"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +40,7 @@ var _ = Describe("ApolloConfig Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		apolloconfig := &apolloadamswanglincomv1.ApolloConfig{}
 
@@ -51,14 +53,23 @@ var _ = Describe("ApolloConfig Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: apolloadamswanglincomv1.ApolloConfigSpec{
+						ApolloConfigServer: "default",
+						ConfigMap:          "cm-test",
+						FileName:           "1.yaml",
+						Apollo: apolloadamswanglincomv1.Config{
+							AppId:           "11111111",
+							ClusterName:     "default",
+							NamespaceName:   "test.yaml",
+							AccessKeySecret: "52465a80e7f54b9f9dd2d78eca148c60",
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &apolloadamswanglincomv1.ApolloConfig{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
@@ -69,8 +80,9 @@ var _ = Describe("ApolloConfig Controller", func() {
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &ApolloConfigReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:      k8sClient,
+				Scheme:      k8sClient.Scheme(),
+				ConfigStore: apollosync.NewConfigStore(k8sClient),
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{

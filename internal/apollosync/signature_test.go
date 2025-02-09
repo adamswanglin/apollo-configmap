@@ -17,11 +17,12 @@
 package apollosync
 
 import (
-	"context"
-	"github.com/go-logr/stdr"
 	"log"
 	"os"
+	"sync"
 	"testing"
+
+	"github.com/go-logr/stdr"
 )
 
 // TestUpdateRemoteConfig tests the getRemoteConfig method of ApolloClient.
@@ -41,10 +42,11 @@ func TestUpdateRemoteConfig(t *testing.T) {
 			NotificationId: -1,
 			Config:         "",
 		},
-		//set log to fmt
-		log: logger,
+		// set log to fmt
+		log:     logger,
+		rwMutex: &sync.RWMutex{},
 	}
-	_, str, err := apolloClient.getRemoteConfig(context.Background())
+	_, str, err := apolloClient.getRemoteConfig()
 	if err == nil {
 		t.Log("config content: \n" + str)
 		return

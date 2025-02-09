@@ -17,16 +17,17 @@
 package controller
 
 import (
+	"context"
+	"reflect"
+
 	"adamswanglin.github.com/apollo-configmap/internal"
 	"adamswanglin.github.com/apollo-configmap/internal/apollosync"
-	"context"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -103,7 +104,7 @@ func (r *ApolloConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return internal.RequeueImmediately()
 	}
 
-	//update label, used for filter
+	// update label, used for filter
 	if aCtx.apolloConfig.Labels == nil {
 		aCtx.apolloConfig.Labels = map[string]string{
 			"apolloConfigServer": "",
@@ -112,7 +113,7 @@ func (r *ApolloConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if label, exist := aCtx.apolloConfig.Labels["apolloConfigServer"]; !exist || label != aCtx.apolloConfig.Spec.ApolloConfigServer {
 		aCtx.apolloConfig.Labels["apolloConfigServer"] = formatLabel(aCtx.apolloConfig.Spec.ApolloConfigServer)
-		//update label
+		// update label
 		if err := r.Update(aCtx, aCtx.apolloConfig); err != nil {
 			_ = r.updateStatusAndReturnError(aCtx, internal.SYNC_STATUS_FAIL, "", err)
 			return internal.RequeueImmediately()
@@ -254,7 +255,7 @@ func (ApolloConfigChangedPredicate) Update(e event.TypedUpdateEvent[client.Objec
 	if isNil(e.ObjectNew) {
 		return false
 	}
-	//spec changed
+	// spec changed
 	if e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration() {
 		return true
 	}

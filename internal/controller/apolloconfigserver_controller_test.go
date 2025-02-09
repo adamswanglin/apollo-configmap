@@ -32,13 +32,13 @@ import (
 
 var _ = Describe("ApolloConfigServer Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const resourceName = "test"
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		apolloconfigserver := &apolloadamswanglincomv1.ApolloConfigServer{}
 
@@ -51,14 +51,15 @@ var _ = Describe("ApolloConfigServer Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: apolloadamswanglincomv1.ApolloConfigServerSpec{
+						ConfigServerURL: "http://localhost:8080",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &apolloadamswanglincomv1.ApolloConfigServer{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
@@ -77,7 +78,7 @@ var _ = Describe("ApolloConfigServer Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your apollosync's reconciliation logic.
+			// TODO(user): Add more specific assertions depending on your apollo-configmap's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
 	})

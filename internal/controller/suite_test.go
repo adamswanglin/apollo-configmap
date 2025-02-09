@@ -94,7 +94,7 @@ var _ = AfterSuite(func() {
 
 // getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.
 // ENVTEST-based tests depend on specific binaries, usually located in paths set by
-// apollosync-runtime. When running tests directly (e.g., via an IDE) without using
+// apollo-configmap-runtime. When running tests directly (e.g., via an IDE) without using
 // Makefile targets, the 'BinaryAssetsDirectory' must be explicitly configured.
 //
 // This function streamlines the process by finding the required binaries, similar to

@@ -1,6 +1,6 @@
 # Apollo-ConfigMap
 
-[中文](README.md) | [English](README_EN.md)
+中文 | [English](README_EN.md)
 
 Apollo-ConfigMap 用来同步 [Apollo Config](https://github.com/apolloconfig/apollo) 配置中心的配置到K8S集群的ConfigMap中。
 

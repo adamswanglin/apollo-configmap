@@ -1,6 +1,6 @@
 # Apollo-ConfigMap
 
-[中文](README.md) | [English](README_EN.md)
+[中文](README.md) | English
 
 Apollo-ConfigMap is a tool for synchronizing configurations from the [Apollo Config](https://github.com/apolloconfig/apollo) management system to ConfigMaps in a Kubernetes (K8S) cluster.
 
