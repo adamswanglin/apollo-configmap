@@ -19,7 +19,7 @@ controller 会自动同步Apollo配置中心的配置到 K8S 集群的 ConfigMap
 
 1. K8S集群中部署apollo-configmap controller：
 ```bash
-kubectl apply -f scripts/deploy.yaml
+kubectl apply -f dist/install.yaml
 ```
 
 2. 查看已创建的资源：
