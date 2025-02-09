@@ -158,10 +158,6 @@ deploy: manifests kustomize ## Deploy apollo-configmap to the K8s cluster specif
 undeploy: kustomize ## Undeploy apollo-configmap from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
-# Generates the released manifests
-.PHONY: release-artifacts
-release-artifacts:
-	$(KUSTOMIZE) build config/default -o scripts/deploy.yaml
 
 ##@ Dependencies
 

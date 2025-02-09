@@ -16,7 +16,7 @@ This project introduces a new method for applications in Kubernetes to access co
 
 1. Deploy the `apollo-configmap` controller in your Kubernetes cluster:
    ```bash
-   kubectl apply -f scripts/deploy.yaml
+   kubectl apply -f dist/install.yaml
    ```
 
 2. Check the created resources:
