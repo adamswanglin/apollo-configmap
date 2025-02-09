@@ -47,7 +47,7 @@ var _ = Describe("Manager", Ordered, func() {
 
 	// Before running the tests, set up the environment by creating the namespace,
 	// enforce the restricted security policy to the namespace, installing CRDs,
-	// and deploying the apollosync.
+	// and deploying the apollo-configmap.
 	BeforeAll(func() {
 		By("creating manager namespace")
 		cmd := exec.Command("kubectl", "create", "ns", namespace)
@@ -71,7 +71,7 @@ var _ = Describe("Manager", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
 	})
 
-	// After all tests have been executed, clean up by undeploying the apollosync, uninstalling CRDs,
+	// After all tests have been executed, clean up by undeploying the apollo-configmap, uninstalling CRDs,
 	// and deleting the namespace.
 	AfterAll(func() {
 		By("cleaning up the curl pod for metrics")
@@ -96,7 +96,7 @@ var _ = Describe("Manager", Ordered, func() {
 	AfterEach(func() {
 		specReport := CurrentSpecReport()
 		if specReport.Failed() {
-			By("Fetching apollosync manager pod logs")
+			By("Fetching apollo-configmap manager pod logs")
 			cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
 			controllerLogs, err := utils.Run(cmd)
 			if err == nil {
@@ -123,13 +123,13 @@ var _ = Describe("Manager", Ordered, func() {
 				_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get curl-metrics logs: %s", err)
 			}
 
-			By("Fetching apollosync manager pod description")
+			By("Fetching apollo-configmap manager pod description")
 			cmd = exec.Command("kubectl", "describe", "pod", controllerPodName, "-n", namespace)
 			podDescription, err := utils.Run(cmd)
 			if err == nil {
 				fmt.Println("Pod description:\n", podDescription)
 			} else {
-				fmt.Println("Failed to describe apollosync pod")
+				fmt.Println("Failed to describe apollo-configmap pod")
 			}
 		}
 	})
@@ -154,7 +154,7 @@ var _ = Describe("Manager", Ordered, func() {
 				podOutput, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred(), "Failed to retrieve controller-manager pod information")
 				podNames := utils.GetNonEmptyLines(podOutput)
-				g.Expect(podNames).To(HaveLen(1), "expected 1 apollosync pod running")
+				g.Expect(podNames).To(HaveLen(1), "expected 1 apollo-configmap pod running")
 				controllerPodName = podNames[0]
 				g.Expect(controllerPodName).To(ContainSubstring("controller-manager"))
 
@@ -203,12 +203,12 @@ var _ = Describe("Manager", Ordered, func() {
 			}
 			Eventually(verifyMetricsEndpointReady).Should(Succeed())
 
-			By("verifying that the apollosync manager is serving the metrics server")
+			By("verifying that the apollo-configmap manager is serving the metrics server")
 			verifyMetricsServerStarted := func(g Gomega) {
 				cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
 				output, err := utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(ContainSubstring("apollosync-runtime.metrics\tServing metrics server"),
+				g.Expect(output).To(ContainSubstring("apollo-configmap-runtime.metrics\tServing metrics server"),
 					"Metrics server not yet started")
 			}
 			Eventually(verifyMetricsServerStarted).Should(Succeed())
@@ -268,7 +268,7 @@ var _ = Describe("Manager", Ordered, func() {
 		// the reconciliation by using the metrics, i.e.:
 		// metricsOutput := getMetricsOutput()
 		// Expect(metricsOutput).To(ContainSubstring(
-		//    fmt.Sprintf(`controller_runtime_reconcile_total{apollosync="%s",result="success"} 1`,
+		//    fmt.Sprintf(`controller_runtime_reconcile_total{apollo-configmap="%s",result="success"} 1`,
 		//    strings.ToLower(<Kind>),
 		// ))
 	})

@@ -78,7 +78,7 @@ var _ = Describe("ApolloConfigServer Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your apollosync's reconciliation logic.
+			// TODO(user): Add more specific assertions depending on your apollo-configmap's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
 	})

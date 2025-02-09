@@ -47,7 +47,7 @@ func RequeueImmediatelyUnlessGenerationChanged(prevGeneration, curGeneration int
 	return NoRequeue()
 }
 
-// Note: In unit test we use Result from apollosync-runtime package from https://github.com/kubernetes-sigs/controller-runtime/blob/2027a413747f2a8cada813dd98b3b1473c253913/pkg/reconcile/reconcile.go#L26
+// Note: In unit test we use Result from apollo-configmap-runtime package from https://github.com/kubernetes-sigs/controller-runtime/blob/2027a413747f2a8cada813dd98b3b1473c253913/pkg/reconcile/reconcile.go#L26
 //       The semantic is as follows (result.Requeue)
 //       if Requeue is True then always requeue duration can be optional.
 //       if Requeue is False and if duration is 0 then NO requeue, but if duration is > 0 then requeue after duration. Its a bit  confusing hence this note.
